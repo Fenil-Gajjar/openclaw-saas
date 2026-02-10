@@ -14,7 +14,7 @@ terraform {
 
   # Backend configuration - store state in S3
   backend "s3" {
-    bucket         = "openclaw-terraform-state-207128437758"  # Create this manually first
+    bucket         = "openclaw-terraform-state-123xm"  # Create this manually first
     key            = "production/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
