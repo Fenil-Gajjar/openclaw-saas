@@ -5,10 +5,10 @@ on:
     branches:
       - main
     paths:
-      - 'openclaw/**'
-      - 'Dockerfile'
-      - '.github/workflows/deploy.yml'
-  workflow_dispatch:  # Manual trigger
+      - openclaw/**
+      - Dockerfile
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -74,15 +74,15 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
 
       - name: Upload Trivy scan results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: trivy-results.sarif
 
   deploy-butler:
     name: Deploy Butler Agent
@@ -100,26 +100,44 @@ jobs:
 
       - name: Update Butler task definition
         run: |
-          TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition openclaw-production-butler --query taskDefinition)
-          echo $TASK_DEFINITION | jq '.containerDefinitions[0].image = "${{ needs.build-and-push.outputs.image-tag }}"' > new-task-def.json
-          
-          aws ecs register-task-definition \
-            --cli-input-json file://new-task-def.json \
-            --family openclaw-production-butler
+          TASK_DEFINITION=$(aws ecs describe-task-definition \
+            --task-definition openclaw-production-butler \
+            --query taskDefinition)
+
+          echo "$TASK_DEFINITION" | jq '
+            {
+              family: .family,
+              taskRoleArn: .taskRoleArn,
+              executionRoleArn: .executionRoleArn,
+              networkMode: .networkMode,
+              containerDefinitions: (
+                .containerDefinitions
+                | map(.image = "${{ needs.build-and-push.outputs.image-tag }}")
+              ),
+              volumes: .volumes,
+              placementConstraints: .placementConstraints,
+              requiresCompatibilities: .requiresCompatibilities,
+              cpu: .cpu,
+              memory: .memory,
+              tags: .tags
+            }' > new-task-def.json
 
       - name: Deploy Butler service (if exists)
         run: |
-          # Check if service exists
-          if aws ecs describe-services --cluster openclaw-production --services openclaw-butler --query 'services[0].status' | grep -q "ACTIVE"; then
+          if aws ecs describe-services \
+            --cluster openclaw-production \
+            --services openclaw-butler \
+            --query 'services[0].status' | grep -q ACTIVE; then
+
             aws ecs update-service \
               --cluster openclaw-production \
               --service openclaw-butler \
               --task-definition openclaw-production-butler \
               --force-new-deployment
-            
+
             echo "Butler service updated successfully"
           else
-            echo "Butler service doesn't exist yet - will be created manually or via Terraform"
+            echo "Butler service doesn't exist yet"
           fi
 
   deploy-scout:
@@ -138,25 +156,44 @@ jobs:
 
       - name: Update Scout task definition
         run: |
-          TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition openclaw-production-scout --query taskDefinition)
-          echo $TASK_DEFINITION | jq '.containerDefinitions[0].image = "${{ needs.build-and-push.outputs.image-tag }}"' > new-task-def.json
-          
-          aws ecs register-task-definition \
-            --cli-input-json file://new-task-def.json \
-            --family openclaw-production-scout
+          TASK_DEFINITION=$(aws ecs describe-task-definition \
+            --task-definition openclaw-production-scout \
+            --query taskDefinition)
+
+          echo "$TASK_DEFINITION" | jq '
+            {
+              family: .family,
+              taskRoleArn: .taskRoleArn,
+              executionRoleArn: .executionRoleArn,
+              networkMode: .networkMode,
+              containerDefinitions: (
+                .containerDefinitions
+                | map(.image = "${{ needs.build-and-push.outputs.image-tag }}")
+              ),
+              volumes: .volumes,
+              placementConstraints: .placementConstraints,
+              requiresCompatibilities: .requiresCompatibilities,
+              cpu: .cpu,
+              memory: .memory,
+              tags: .tags
+            }' > new-task-def.json
 
       - name: Deploy Scout service (if exists)
         run: |
-          if aws ecs describe-services --cluster openclaw-production --services openclaw-scout --query 'services[0].status' | grep -q "ACTIVE"; then
+          if aws ecs describe-services \
+            --cluster openclaw-production \
+            --services openclaw-scout \
+            --query 'services[0].status' | grep -q ACTIVE; then
+
             aws ecs update-service \
               --cluster openclaw-production \
               --service openclaw-scout \
               --task-definition openclaw-production-scout \
               --force-new-deployment
-            
+
             echo "Scout service updated successfully"
           else
-            echo "Scout service doesn't exist yet - will be created manually or via Terraform"
+            echo "Scout service doesn't exist yet"
           fi
 
   deploy-writer:
@@ -175,38 +212,62 @@ jobs:
 
       - name: Update Writer task definition
         run: |
-          TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition openclaw-production-writer --query taskDefinition)
-          echo $TASK_DEFINITION | jq '.containerDefinitions[0].image = "${{ needs.build-and-push.outputs.image-tag }}"' > new-task-def.json
-          
-          aws ecs register-task-definition \
-            --cli-input-json file://new-task-def.json \
-            --family openclaw-production-writer
+          TASK_DEFINITION=$(aws ecs describe-task-definition \
+            --task-definition openclaw-production-writer \
+            --query taskDefinition)
+
+          echo "$TASK_DEFINITION" | jq '
+            {
+              family: .family,
+              taskRoleArn: .taskRoleArn,
+              executionRoleArn: .executionRoleArn,
+              networkMode: .networkMode,
+              containerDefinitions: (
+                .containerDefinitions
+                | map(.image = "${{ needs.build-and-push.outputs.image-tag }}")
+              ),
+              volumes: .volumes,
+              placementConstraints: .placementConstraints,
+              requiresCompatibilities: .requiresCompatibilities,
+              cpu: .cpu,
+              memory: .memory,
+              tags: .tags
+            }' > new-task-def.json
 
       - name: Deploy Writer service (if exists)
         run: |
-          if aws ecs describe-services --cluster openclaw-production --services openclaw-writer --query 'services[0].status' | grep -q "ACTIVE"; then
+          if aws ecs describe-services \
+            --cluster openclaw-production \
+            --services openclaw-writer \
+            --query 'services[0].status' | grep -q ACTIVE; then
+
             aws ecs update-service \
               --cluster openclaw-production \
               --service openclaw-writer \
               --task-definition openclaw-production-writer \
               --force-new-deployment
-            
+
             echo "Writer service updated successfully"
           else
-            echo "Writer service doesn't exist yet - will be created manually or via Terraform"
+            echo "Writer service doesn't exist yet"
           fi
 
   notify:
     name: Notify Deployment Status
-    needs: [deploy-butler, deploy-scout, deploy-writer]
+    needs:
+      - deploy-butler
+      - deploy-scout
+      - deploy-writer
     runs-on: ubuntu-latest
     if: always()
 
     steps:
       - name: Deployment summary
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Butler**: ${{ needs.deploy-butler.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Scout**: ${{ needs.deploy-scout.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Writer**: ${{ needs.deploy-writer.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image Digest**: ${{ needs.build-and-push.outputs.image-digest }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Deployment Summary"
+            echo "- **Butler**: ${{ needs.deploy-butler.result }}"
+            echo "- **Scout**: ${{ needs.deploy-scout.result }}"
+            echo "- **Writer**: ${{ needs.deploy-writer.result }}"
+            echo "- **Image Digest**: ${{ needs.build-and-push.outputs.image-digest }}"
+          } >> "$GITHUB_STEP_SUMMARY"
